@@ -3,8 +3,8 @@
 # Date: 2018-03-04
 #
 # This downloads, builds and installs the gcc-6.4.0 compiler and boost
-# 1.66. It handles the dependent packages like gmp-6.0.0a, mpfr-3.1.2,
-# mpc-1.0.3, ppl-1.1, cloog-0.18.1 and binutils-2.24.
+# 1.66. It handles the dependent packages like gmp-6.1.2, mpfr-4.0.1,
+# mpc-1.1.0, ppl-1.2, cloog-0.18.4 and binutils-2.30.
 #
 # To install gcc-6.4.0 in ~/tmp/gcc-6.4.0/rtf/bin you would run this
 # script as follows:
@@ -261,13 +261,7 @@ function check-platform
 {
     local plat=$(get-platform)
     local tested_plats=(
-        'linux-centos-5.5-x86_64'
-        'linux-centos-5.8-x86_64'
-        'linux-centos-6.3-x86_64'
-        'linux-centos-6.4-x86_64'
-        'linux-centos-6.5-x86_64'
-        'macos-darwin-13.2.0-x86_64'
-	'macos-darwin-13.4.0-x86_64'
+        'linux-centos-6.9-x86_64'
     )
     local plat_found=0
 
@@ -310,14 +304,16 @@ function my-readlink
 # List of archives
 # The order is important.
 ARS=(
-    http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz
-    https://gmplib.org/download/gmp/gmp-6.0.0a.tar.bz2
-    http://mpfr.loria.fr/mpfr-3.1.2/mpfr-3.1.2.tar.bz2
-    https://ftp.gnu.org/gnu/mpc/mpc-1.0.3.tar.gz
-    http://bugseng.com/products/ppl/download/ftp/releases/1.1/ppl-1.1.tar.bz2
-    http://www.bastoul.net/cloog/pages/download/cloog-0.18.1.tar.gz
+    http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.15.tar.gz
+    https://ftp.gnu.org/gnu/m4/m4-1.4.18.tar.gz
+    https://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz
+    https://gmplib.org/download/gmp/gmp-6.1.2.tar.bz2
+    http://www.mpfr.org/mpfr-current/mpfr-4.0.1.tar.gz
+    https://ftp.gnu.org/gnu/mpc/mpc-1.1.0.tar.gz
+    http://bugseng.com/external/ppl/download/ftp/releases/1.2/ppl-1.2.tar.bz2
+    http://www.bastoul.net/cloog/pages/download/cloog-0.18.4.tar.gz
     https://ftp.gnu.org/gnu/gcc/gcc-6.4.0/gcc-6.4.0.tar.gz
-    http://ftp.gnu.org/gnu/binutils/binutils-2.24.tar.bz2
+    https://ftp.gnu.org/gnu/binutils/binutils-2.30.tar.bz2
     https://dl.bintray.com/boostorg/release/1.66.0/source/boost_1_66_0.tar.bz2
     #
     # Why glibc is disabled (for now).
@@ -414,36 +410,13 @@ for ar in ${ARS[@]} ; do
     else
         # unpack
         pushd $SRCDIR
-        case "$ext" in
-            "bz2")
-                docmd $ar tar jxf ${ARDIR}/$fn
-                ;;
-            "gz")
-                docmd $ar tar zxf ${ARDIR}/$fn
-                ;;
-            "tar")
-                docmd $ar tar xf ${ARDIR}/$fn
-                ;;
-            *)
-                doerr "unrecognized extension: $ext" "Can't continue."
-                ;;
-        esac
+        docmd $ar tar xf  ${ARDIR}/$fn
         popd
         if [ ! -d $sd ] ;  then
             # Some archives (like gcc-g++) overlay. We create a dummy
             # directory to avoid extracting them every time.
-            mkdir -p $sd
+            docmd $ar mkdir -p $sd
         fi
-    fi
-
-    # special hack for gmp-6.0.0a
-    if [[ $d == "gmp-6.0.0a" ]] ; then
-	if [ ! -f $sd/configure ] ; then
-	    sdn="$SRCDIR/gmp-6.0.0"
-	    echo "INFO: fixing $sdn --> $sd"
-	    docmd $sd rm -rf $sd
-	    docmd $sd ln -s $sdn $sd
-	fi
     fi
 done
 
@@ -476,6 +449,12 @@ for ar in ${ARS[@]} ; do
         run_conf=1
         run_boost_bootstrap=0
         case "$d" in
+            autoconf-*)
+                CONF_ARGS=(
+                    --prefix=${RTFDIR}
+                )
+                ;;
+
             binutils-*)
                 # Binutils will not compile with strict error
                 # checking on so I disabled -Werror by setting
@@ -536,6 +515,7 @@ for ar in ${ARS[@]} ; do
                     --prefix=${RTFDIR}
                     --with-cloog=${RTFDIR}
                     --with-gmp=${RTFDIR}
+                    --with-isl=${RTFDIR}
                     --with-mlgmp=${RTFDIR}
                     --with-mpc=${RTFDIR}
                     --with-mpfr=${RTFDIR}
@@ -566,6 +546,29 @@ for ar in ${ARS[@]} ; do
                 ;;
 
             libiconv-*)
+                CONF_ARGS=(
+                    --prefix=${RTFDIR}
+                )
+
+                # Fixup for darwin.
+                if [[ "$plat" =~ ^macos-* ]] ; then
+                    cat >/tmp/$$ <<EOF
+
+/* These symbol names are needed to build on Mac OS X. */
+#ifndef _LIBICONV_H_PATCH
+#define _LIBICONV_H_PATCH
+#define _iconv       iconv
+#define _iconv_close iconv_close
+#define _iconv_open  iconv_open
+#endif  /* _LIBICONV_H_PATCH */
+EOF
+                    cat /tmp/$$ >> $sd/include/iconv.h.build.in
+                    cat /tmp/$$ >> $sd/include/iconv.h.in
+                    rm -f /tmp/$$
+                fi
+                ;;
+
+            m4-*)
                 CONF_ARGS=(
                     --prefix=${RTFDIR}
                 )
@@ -673,6 +676,23 @@ for ar in ${ARS[@]} ; do
 done
 
 # ================================================================
+# Create environment setup tools.
+# ================================================================
+if [ ! -f $RTFDIR/bin/gcc-enable ] ; then
+    echo "INFO: Creating gcc-enable and gcc-disable"
+    cat >$RTFDIR/bin/gcc-enable <<EOF
+export PATH="$RTFDIR/bin:\$PATH"
+export LD_LIBRARY_PATH="$RTFDIR/lib64:$RTFDIR/lib:\$LD_LIBRARY_PATH"
+EOF
+    cat >$RTFDIR/bin/gcc-disable <<EOF
+export PATH="\$(echo \$PATH | sed -e 's@$RTFDIR/bin:@@')"
+export LD_LIBRARY_PATH="\$(echo \$LD_LIBRARY_PATH | sed -e 's@$RTFDIR/lib64:$RTFDIR/lib@@')"
+EOF
+    chmod a+x $RTFDIR/bin/gcc-enable
+    chmod a+x $RTFDIR/bin/gcc-disable
+fi
+
+# ================================================================
 # Test
 # ================================================================
 if [ -d $TSTDIR ] ; then
@@ -684,12 +704,6 @@ else
     docmd "LOCAL TEST  2" which gcc
     docmd "LOCAL TEST  3" which c++
     docmd "LOCAL TEST  4" g++ --version
-
-    # Set test environment.
-    cat >setenv.sh <<EOF
-export PATH="${RTFDIR}/bin:\${PATH}"
-export LD_LIBRARY_PATH="${RTFDIR}/lib:${RTFDIR}/lib64:\${LD_LIBRARY_PATH}"
-EOF
 
     # Simple aliveness test.
     cat >test1.cc <<EOF
@@ -888,3 +902,23 @@ EOF
 
     popd
 fi
+
+# ================================================================
+# Done.
+# ================================================================
+cat <<EOF
+
+gcc-6.4.0 build completed successfully.
+
+To enable it in your environment:
+
+    \$ source $RTFDIR/bin/gcc-enable
+    \$ gcc --version
+    \$ g++ --version
+
+To disable it:
+
+    \$ source $RTFDIR/bin/gcc-disable
+
+Done.
+EOF
