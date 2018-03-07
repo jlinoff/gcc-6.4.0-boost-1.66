@@ -686,7 +686,7 @@ export LD_LIBRARY_PATH="$RTFDIR/lib64:$RTFDIR/lib:\$LD_LIBRARY_PATH"
 EOF
     cat >$RTFDIR/bin/gcc-disable <<EOF
 export PATH="\$(echo \$PATH | sed -e 's@$RTFDIR/bin:@@')"
-export LD_LIBRARY_PATH="\$(echo \$LD_LIBRARY_PATH | sed -e 's@$RTFDIR/lib64:$RTFDIR/lib@@')"
+export LD_LIBRARY_PATH="\$(echo \$LD_LIBRARY_PATH | sed -e 's@$RTFDIR/lib64:$RTFDIR/lib:@@')"
 EOF
     chmod a+x $RTFDIR/bin/gcc-enable
     chmod a+x $RTFDIR/bin/gcc-disable
