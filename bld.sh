@@ -33,6 +33,26 @@
 # When the build is complete you can safely remove the archives, bld
 # and src directory trees to save disk space.
 #
+# If you want to change the default directory locations, override
+# these variables.
+#
+#    ROOTDIR   The root directory.
+#              Default: current directory.
+#
+#    ARDIR     The archive directory.
+#              Default: $ROOTDIR/archives.
+#
+#    RTFDIR    The release directory.
+#              Default: $ROOTDIR/rtf.
+#              This is where the bin and lib  directories are
+#              located.
+#
+#    SRCDIR    The source directory.
+#              Default: $ROTDIR/src.
+#
+#    BLDDIR    The build directory.
+#              Default: $ROOTDIR/bld.
+#
 # Copyright (C) 2013 Joe Linoff
 #
 # Permission is hereby granted, free of charge, to any person
@@ -341,19 +361,24 @@ check-platform
 unset LIBRARY_PATH CPATH C_INCLUDE_PATH PKG_CONFIG_PATH CPLUS_INCLUDE_PATH INCLUDE
 
 # Read the command line argument, if it exists.
-ROOTDIR=$(my-readlink .)
+_ROOTDIR=$(my-readlink .)
 if (( $# == 1 )) ; then
-    ROOTDIR=$(my-readlink $1)
+    _ROOTDIR=$(my-readlink $1)
 elif (( $# > 1 )) ; then
     doerr "too many command line arguments ($#), only zero or one is allowed" "foo"
 fi
 
 # Setup the directories.
-ARDIR="$ROOTDIR/archives"
-RTFDIR="$ROOTDIR/rtf"
-SRCDIR="$ROOTDIR/src"
-BLDDIR="$ROOTDIR/bld"
-TSTDIR="$SRCDIR/LOCAL-TEST"
+# Allow the user to override.
+# For example:
+#    $ MR=/opt/gcc/6.4.0
+#    $ ROOTDIR=$MR RTFDIR=$MR ARDIR=$MR/cache SRCDIR=$MR/pkg/src BLDDIR=$MR/pkg/bld ./bld.sh
+: ${ROOTDIR=$_ROOTDIR}
+: ${ARDIR=$ROOTDIR/archives}
+: ${RTFDIR=$ROOTDIR/rtf}
+: ${SRCDIR=$ROOTDIR/src}
+: ${BLDDIR=$ROOTDIR/bld}
+: ${TSTDIR=$SRCDIR/LOCAL-TEST}
 
 export PATH="${RTFDIR}/bin:${PATH}"
 export LD_LIBRARY_PATH="${RTFDIR}/lib:${RTFDIR}/lib64:${LD_LIBRARY_PATH}"
@@ -367,8 +392,8 @@ echo "# RtfDir     : $RTFDIR"
 echo "# SrcDir     : $SRCDIR"
 echo "# BldDir     : $BLDDIR"
 echo "# TstDir     : $TSTDIR"
-echo "# Gcc        : "$(which gcc)
-echo "# GccVersion : "$(gcc --version | head -1)
+echo "# Gcc        : "$(which gcc 2>/dev/null | head -1)
+echo "# GccVersion : "$(gcc --version 2>/dev/null | head -1)
 echo "# Hostname   : "$(hostname)
 echo "# O/S        : "$(uname -s -r -v -m)
 echo "# Date       : "$(date)
