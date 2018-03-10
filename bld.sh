@@ -79,32 +79,7 @@
 # Trim a string, remove internal spaces, convert to lower case.
 # ================================================================
 function get-platform-trim {
-    local s=$(echo "$1" | tr -d '[ \t]' | tr 'A-Z' 'a-z')
-    echo $s
-}
-
-# ================================================================
-# Get the platform root name.
-# ================================================================
-function get-platform-root
-{
-    if which uname >/dev/null 2>&1 ; then
-        # Greg Moeller reported that the original code didn't
-        # work because the -o option is not available on solaris.
-        # I modified the script to correctly identify that
-        # case and recover by using the -s option.
-        if uname -o >/dev/null 2>&1 ; then
-            # Linux distro
-            uname -o | tr 'A-Z' 'a-z'
-        elif uname -s >/dev/null 2>&1 ; then
-            # Solaris variant
-            uname -s | tr 'A-Z' 'a-z'
-        else
-            echo "unknown"
-        fi
-    else
-        echo "unknown"
-    fi
+    echo "$*" | tr -d '[ \t]' | tr 'A-Z' 'a-z'
 }
 
 # ================================================================
@@ -121,46 +96,63 @@ function get-platform-root
 # ================================================================
 function get-platform
 {
-    local plat=$(get-platform-root)
-    case "$plat" in
-        "gnu/linux")
-            d=$(get-platform-trim "$(lsb_release -i)" | awk -F: '{print $2;}')
-            r=$(get-platform-trim "$(lsb_release -r)" | awk -F: '{print $2;}')
-            m=$(get-platform-trim "$(uname -m)")
-            if [[ "$d" == "redhatenterprise"* ]] ; then
-                # Need a little help for Red Hat because
-                # they don't make the minor version obvious.
-                d="rhel_${d:16}"  # keep the tail (e.g., es or client)
-                x=$(get-platform-trim "$(lsb_release -c)" | \
-                    awk -F: '{print $2;}' | \
-                    sed -e 's/[^0-9]//g')
-                r="$r.$x"
+    local OS_NAME='unknown'
+    local OS_ARCH='unknown'
+    local DISTRO_NAME='unknown'
+    local DISTRO_VERSION='unknown'
+
+    if uname >/dev/null 2>&1 ; then
+        # If uname is present we are in good shape.
+        # If it isn't present we have a problem.
+        OS_NAME=$(uname 1>/dev/null 2>&1 && get-platform-trim $(uname) || echo 'unknown')
+        OS_ARCH=$(uname -m 1>/dev/null 2>&1 && get-platform-trim $(uname -m) || echo 'unknown')
+    fi
+
+    case "$OS_NAME" in
+        cygwin)
+            # Not well tested.
+            OS_NAME='linux'
+            DISTRO_NAME=$(awk -F- '{print $1}')
+            DISTRO_VERSION=$(awk -F- '{print $2}')
+            OS_ARCH=$(awk -F- '{print $3}')
+            ;;
+        darwin)
+            # Not well tested for older versions of Mac OS X.
+            DISTRO_NAME=$(get-platform-trim $(system_profiler SPSoftwareDataType | grep 'System Version:' | awk '{print $3}'))
+            DISTRO_VERSION=$(get-platform-trim $(system_profiler SPSoftwareDataType | grep 'System Version:' | awk '{print $4}'))
+            ;;
+        linux)
+            if [ -f /etc/centos-release ] ; then
+                # centos 6, 7
+                DISTRO_NAME='centos'
+                DISTRO_VERSION=$(awk '{for(i=1;i<=NF;i++){if($i ~ /^[0-9]/){print $i; break}}}' /etc/centos-release)
+            elif [ -f /etc/fedora-release ] ; then
+                DISTRO_NAME='fedora'
+                DISTRO_VERSION=$(awk '{for(i=1;i<=NF;i++){if($i ~ /^[0-9]/){print $i; break}}}' /etc/fedora-release)
+            elif [ -f /etc/redhat-release ] ; then
+                # other flavors of redhat.
+                DISTRO_NAME=$(get-platform-trim $(awk '{print $1}' /etc/redhat-release))
+                DISTRO_VERSION=$(awk '{for(i=1;i<=NF;i++){if($i ~ /^[0-9]/){print $i; break}}}' /etc/redhat-release)
+            elif [ -f /etc/os-release ] ; then
+                # Tested for recent versions of debian and ubuntu.
+                if grep -q '^ID=' /etc/os-release ; then
+                    DISTRO_NAME=$(get-platform-trim $(awk -F= '/^ID=/{print $2}' /etc/os-release))
+                    DISTRO_VERSION=$(get-platform-trim $(awk -F= '/^VERSION=/{print $2}' /etc/os-release | \
+                                                  sed -e 's/"//g' | \
+                                                  awk '{print $1}'))
+                fi
             fi
-            echo "linux-$d-$r-$m"
             ;;
-        "cygwin")
-            x=$(get-platform-trim "$(uname)")
-            echo "linux-$x"
-            ;;
-        "sunos")
-            d=$(get-platform-trim "$(uname -v)")
-            r=$(get-platform-trim "$(uname -r)")
-            m=$(get-platform-trim "$(uname -m)")
-            echo "sunos-$d-$r-$m"
-            ;;
-        "darwin")
-            d=$(get-platform-trim "$(uname -s)")
-            r=$(get-platform-trim "$(uname -r)")
-            m=$(get-platform-trim "$(uname -m)")
-            echo "macos-$d-$r-$m"
-            ;;
-        "unknown")
-            echo "unk-unk-unk-unk"
+        sunos)
+            # Not well tested.
+            OS_NAME='sunos'
+            DISTRO_NAME=$(get-platform-trim $(uname -v))
+            DISTRO_VERSION=$(get-platform-trim $(uname -r))
             ;;
         *)
-            echo "$plat-unk-unk-unk"
             ;;
     esac
+    printf '%s-%s-%s-%s\n' "$OS_NAME" "$DISTRO_NAME" "$DISTRO_VERSION" "$OS_ARCH"
 }
 
 # ================================================================
@@ -269,6 +261,7 @@ function mkdirs {
         if [ ! -d $d ] ; then
             #echo "    creating $d"
             mkdir -p $d
+            (( $? )) && doerr "directory creation failed: $d"
         fi
     done
 }
@@ -295,27 +288,6 @@ function check-platform
     if (( $plat_found == 0 )) ; then
         echo "WARNING: This platform ($plat) has not been tested."
     fi
-}
-
-# ================================================================
-# my-readlink <dir>
-# Some platforms (like darwin) do not support "readlink -f".
-# This function checks to see if readlink -f is available,
-# if it isn't then it uses a more POSIX compliant approach.
-# ================================================================
-function my-readlink
-{
-    # First make sure that the command works.
-    readlink -f "$1" 1>/dev/null 2>/dev/null
-    local st=$?
-    if (( $st )) ; then
-        # If readlink didn't work then this may be a platform
-        # like Mac OS X.
-        local abspath="$(cd $(dirname .); pwd)"
-    else
-        local abspath=$(readlink -f "$1" 2>/dev/null)
-    fi
-    echo "$abspath"
 }
 
 # ================================================================
@@ -361,11 +333,20 @@ check-platform
 unset LIBRARY_PATH CPATH C_INCLUDE_PATH PKG_CONFIG_PATH CPLUS_INCLUDE_PATH INCLUDE
 
 # Read the command line argument, if it exists.
-_ROOTDIR=$(my-readlink .)
 if (( $# == 1 )) ; then
-    _ROOTDIR=$(my-readlink $1)
+    # This logic allows readlink to be avoided because it
+    # has different options on linux and mac. In particular,
+    # on the mac, it cannot handle undefined directories.
+    if [ ! -d "$1" ] ; then
+        mkdir -p "$1"
+        (( $? )) && doerr "directory creation failed: $1" | true
+    fi
+    cd $1
+    _ROOTDIR=$(pwd)
 elif (( $# > 1 )) ; then
     doerr "too many command line arguments ($#), only zero or one is allowed" "foo"
+else
+    _ROOTDIR=$(pwd)
 fi
 
 # Setup the directories.
