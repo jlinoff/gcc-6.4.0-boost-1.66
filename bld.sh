@@ -275,6 +275,7 @@ function check-platform
     local plat=$(get-platform)
     local tested_plats=(
         'linux-centos-6.9-x86_64'
+        'darwin-macos-10.13.3-x86_64'
     )
     local plat_found=0
 
@@ -393,7 +394,7 @@ for ar in ${ARS[@]} ; do
     ext=${ard[2]}
     d=${ard[3]}
     if [  -f "${ARDIR}/$fn" ] ; then
-        echo "INFO: already downloaded $fn"
+        echo "INFO:${LINENO}: already downloaded $fn"
     else
         # get
         docmd $ar curl -L -o $ARDIR/$fn $ar
@@ -412,7 +413,7 @@ for ar in ${ARS[@]} ; do
     d=${ard[3]}
     sd="$SRCDIR/$d"
     if [ -d $sd ] ; then
-        echo "INFO: already extracted $fn"
+        echo "INFO:${LINENO}: already extracted $fn"
     else
         # unpack
         pushd $SRCDIR
@@ -438,14 +439,14 @@ for ar in ${ARS[@]} ; do
     sd="$SRCDIR/$d"
     bd="$BLDDIR/$d"
     if [ -d $bd ] ; then
-        echo "INFO: already built $sd"
+        echo "INFO:${LINENO}: already built $sd"
     else
         # Build
         regex='^gcc-g\+\+.*'
         if [[ $fn =~ $regex ]] ; then
             # Don't build/configure the gcc-g++ package explicitly because
             # it is part of the regular gcc package.
-            echo "INFO: skipping $sd"
+            echo "INFO:${LINENO}: skipping $sd"
             # Dummy
             continue
         fi
@@ -527,6 +528,22 @@ for ar in ${ARS[@]} ; do
                     --with-mpfr=${RTFDIR}
                     --with-ppl=${RTFDIR}
                 )
+                # Fixup for darwin.
+                if [[ "$plat" =~ ^darwin- ]] ; then
+                    # Special case for darwin, the gcc package expects to
+                    # see:
+                    #    iconv()
+                    #    iconv_open()
+                    #    iconv_close()
+                    # But they are built as:
+                    #    _libiconv()
+                    #    _libiconv_open()
+                    #    _libiconv_close()
+                    echo "INFO:${LINENO}: fixing libiconv references for $plat"
+                    set -x
+                    LC_ALL=C time sed -i.bak -e 's@\(iconv[^\(]*(\)@_lib\1@g' $(grep -l -r 'iconv[^\(]*(' $sd 2>/dev/null)
+                    { set +x; } 2>/dev/null
+                fi
                 ;;
 
             glibc-*)
@@ -555,23 +572,6 @@ for ar in ${ARS[@]} ; do
                 CONF_ARGS=(
                     --prefix=${RTFDIR}
                 )
-
-                # Fixup for darwin.
-                if [[ "$plat" =~ ^darwin-* ]] ; then
-                    cat >/tmp/$$ <<EOF
-
-/* These symbol names are needed to build on Mac OS X. */
-#ifndef _LIBICONV_H_PATCH
-#define _LIBICONV_H_PATCH
-#define _iconv       iconv
-#define _iconv_close iconv_close
-#define _iconv_open  iconv_open
-#endif  /* _LIBICONV_H_PATCH */
-EOF
-                    cat /tmp/$$ >> $sd/include/iconv.h.build.in
-                    cat /tmp/$$ >> $sd/include/iconv.h.in
-                    rm -f /tmp/$$
-                fi
                 ;;
 
             m4-*)
@@ -685,7 +685,7 @@ done
 # Create environment setup tools.
 # ================================================================
 if [ ! -f $RTFDIR/bin/gcc-enable ] ; then
-    echo "INFO: Creating gcc-enable and gcc-disable"
+    echo "INFO:${LINENO}: Creating gcc-enable and gcc-disable"
     cat >$RTFDIR/bin/gcc-enable <<EOF
 export PATH="$RTFDIR/bin:\$PATH"
 export LD_LIBRARY_PATH="$RTFDIR/lib64:$RTFDIR/lib:\$LD_LIBRARY_PATH"
@@ -702,7 +702,7 @@ fi
 # Test
 # ================================================================
 if [ -d $TSTDIR ] ; then
-    echo "INFO: skipping tests"
+    echo "INFO:${LINENO}: skipping tests"
 else
     docmd "MKDIR" mkdir -p $TSTDIR
     pushd $TSTDIR
