@@ -90,8 +90,8 @@ function get-platform-trim {
 #   ^      ^      ^     ^
 #   |      |      |     +----- architecture: x86_64, i86pc, etc.
 #   |      |      +----------- version: 5.5, 6.4, 10.9, etc.
-#   |      +------------------ distribution: centos, rhel, nexenta, darwin
-#   +------------------------- platform: linux, sunos, macos
+#   |      +------------------ distribution: debian, centos, macos, ubuntu
+#   +------------------------- platform: linux, sunos, darwin
 #
 # ================================================================
 function get-platform
@@ -557,7 +557,7 @@ for ar in ${ARS[@]} ; do
                 )
 
                 # Fixup for darwin.
-                if [[ "$plat" =~ ^macos-* ]] ; then
+                if [[ "$plat" =~ ^darwin-* ]] ; then
                     cat >/tmp/$$ <<EOF
 
 /* These symbol names are needed to build on Mac OS X. */
