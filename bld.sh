@@ -360,7 +360,7 @@ fi
 : ${RTFDIR=$ROOTDIR/rtf}
 : ${SRCDIR=$ROOTDIR/src}
 : ${BLDDIR=$ROOTDIR/bld}
-: ${TSTDIR=$SRCDIR/LOCAL-TEST}
+: ${TSTDIR=$ROOTDIR/test}
 
 export PATH="${RTFDIR}/bin:${PATH}"
 export LD_LIBRARY_PATH="${RTFDIR}/lib:${RTFDIR}/lib64:${LD_LIBRARY_PATH}"
