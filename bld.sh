@@ -79,7 +79,7 @@
 # Trim a string, remove internal spaces, convert to lower case.
 # ================================================================
 function get-platform-trim {
-    echo "$*" | tr -d '[ \t]' | tr 'A-Z' 'a-z'
+    echo "$*" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]'
 }
 
 # ================================================================
@@ -104,8 +104,8 @@ function get-platform
     if uname >/dev/null 2>&1 ; then
         # If uname is present we are in good shape.
         # If it isn't present we have a problem.
-        OS_NAME=$(uname 1>/dev/null 2>&1 && get-platform-trim $(uname) || echo 'unknown')
-        OS_ARCH=$(uname -m 1>/dev/null 2>&1 && get-platform-trim $(uname -m) || echo 'unknown')
+        OS_NAME=$(uname 1>/dev/null 2>&1 && get-platform-trim "$(uname)" || echo 'unknown')
+        OS_ARCH=$(uname -m 1>/dev/null 2>&1 && get-platform-trim "$(uname -m)" || echo 'unknown')
     fi
 
     case "$OS_NAME" in
@@ -340,9 +340,9 @@ if (( $# == 1 )) ; then
     # on the mac, it cannot handle undefined directories.
     if [ ! -d "$1" ] ; then
         mkdir -p "$1"
-        (( $? )) && doerr "directory creation failed: $1" | true
+        (( $? )) && doerr "directory creation failed: $1" || true
     fi
-    cd $1
+    cd "$1"
     _ROOTDIR=$(pwd)
 elif (( $# > 1 )) ; then
     doerr "too many command line arguments ($#), only zero or one is allowed" "foo"
