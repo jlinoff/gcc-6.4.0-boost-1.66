@@ -50,8 +50,12 @@ To specify alternate installation locations, build with the following variables 
 #
 #    TSTDIR    The test directory.
 #              Default: $ROOTDIR/test.
+#
+#    BCXXVER   The boost C++ version.
+#              Default: gnu++14 (passed to b2)
+#
 $ MR=/opt/gcc/6.4.0
-$ ROOTDIR=$MR RTFDIR=$MR ARDIR=$MR/cache SRCDIR=$MR/pkg/src BLDDIR=$MR/pkg/bld make
+$ BCXXVER=gnu++17 ROOTDIR=$MR RTFDIR=$MR ARDIR=$MR/cache SRCDIR=$MR/pkg/src BLDDIR=$MR/pkg/bld make
 ```
 
 For more detailed information see http://joelinoff.com/blog/?p=1678.
