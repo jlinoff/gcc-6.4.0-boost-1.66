@@ -53,6 +53,12 @@
 #    BLDDIR    The build directory.
 #              Default: $ROOTDIR/bld.
 #
+#    TSTDIR    The test directory.
+#              Default: $ROOTDIR/test.
+#
+#    BCXXVER   The boost C++ version.
+#              Default: gnu++14 (passed to b2)
+#
 # Copyright (C) 2013 Joe Linoff
 #
 # Permission is hereby granted, free of charge, to any person
@@ -361,6 +367,7 @@ fi
 : ${SRCDIR=$ROOTDIR/src}
 : ${BLDDIR=$ROOTDIR/bld}
 : ${TSTDIR=$ROOTDIR/test}
+: ${BCXXVER=gnu++14}
 
 export PATH="${RTFDIR}/bin:${PATH}"
 export LD_LIBRARY_PATH="${RTFDIR}/lib:${RTFDIR}/lib64:${LD_LIBRARY_PATH}"
@@ -376,6 +383,7 @@ echo "# BldDir     : $BLDDIR"
 echo "# TstDir     : $TSTDIR"
 echo "# Gcc        : "$(which gcc 2>/dev/null | head -1)
 echo "# GccVersion : "$(gcc --version 2>/dev/null | head -1)
+echo "# BoostCxxVer: $BCXXVER"
 echo "# Hostname   : "$(hostname)
 echo "# O/S        : "$(uname -s -r -v -m)
 echo "# Date       : "$(date)
@@ -491,10 +499,6 @@ for ar in ${ARS[@]} ; do
                 # that the build occur in the source directory.
                 run_conf=0
                 run_boost_bootstrap=1
-                CONF_ARGS=(
-                    --prefix=${RTFDIR}
-                    --with-python=python2.7
-                )
                 ;;
 
             cloog-*)
@@ -659,17 +663,12 @@ for ar in ${ARS[@]} ; do
             docmd $ar make install
         fi
         if (( $run_boost_bootstrap )) ; then
+            # CITATION: http://www.boost.org/build/doc/html/bbv2/overview/invocation.html
             pushd $sd
             docmd $ar which g++
-            docmd $ar gcc --version
-            docmd $ar $sd/bootstrap.sh --help
-            docmd $ar $sd/bootstrap.sh ${CONF_ARGS[@]}
-            docmd $ar ./b2 --help
-            docmd $ar ./b2 --clean
-            docmd $ar ./b2 --reconfigure
-            docmd $ar ./b2 -a -d+2 --build-dir $bd
-            docmd $ar ./b2 -d+2 --build-dir $bd install
-            docmd $ar ./b2 install
+            docmd $ar g++ --version
+            docmd $ar $sd/bootstrap.sh --prefix=${RTFDIR} toolset=gcc
+            docmd $ar ./b2 -j4 toolset=gcc variant=release link=shared,static threading=multi cxxflags="-std=$BCXXVER" install
             popd
         fi
 
